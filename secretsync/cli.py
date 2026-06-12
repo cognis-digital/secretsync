@@ -61,6 +61,30 @@ def _build_parser() -> argparse.ArgumentParser:
     r.add_argument("--new-key", required=True)
     r.add_argument("--out")
 
+    pk = sub.add_parser("peek", help="Describe a sealed object without decrypting it.")
+    pk.add_argument("sealed")
+    pk.add_argument("--format", choices=("table", "json"), default="table")
+
+    vf = sub.add_parser("verify", help="Verify every value's MAC without exposing plaintext.")
+    vf.add_argument("sealed")
+    vf.add_argument("--key", required=True, help="Key (.sealkey).")
+    vf.add_argument("--format", choices=("table", "json"), default="table")
+
+    sf = sub.add_parser("seal-file", help="Seal an arbitrary file into a SealedBlob.")
+    sf.add_argument("file")
+    sf.add_argument("--key", required=True)
+    sf.add_argument("--out")
+
+    uf = sub.add_parser("unseal-file", help="Unseal a SealedBlob to bytes on disk.")
+    uf.add_argument("sealed")
+    uf.add_argument("--key", required=True)
+    uf.add_argument("--out", required=True, help="Where to write the decrypted file.")
+
+    mg = sub.add_parser("merge", help="Merge multiple SealedSecrets (same key) into one.")
+    mg.add_argument("sealed", nargs="+")
+    mg.add_argument("--key", required=True)
+    mg.add_argument("--out")
+
     sub.add_parser("mcp", help="Run as an MCP server (stdio JSON-RPC).")
     return p
 
@@ -124,6 +148,79 @@ def _run_rotate(a) -> int:
     return 0
 
 
+def _run_peek(a) -> int:
+    from secretsync import peek
+    try:
+        info = peek(load_json(a.sealed))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if a.format == "json":
+        print(json.dumps(info, indent=2))
+    else:
+        print(f"secretsync peek — {info['kind']} {info.get('name')}")
+        print("=" * 56)
+        print(f"  key_id     : {info['key_id']}")
+        print(f"  value keys : {', '.join(info['value_keys']) or '(blob)'}")
+        print(f"  value count: {info['value_count']}")
+    return 0
+
+
+def _run_verify(a) -> int:
+    from secretsync import verify_sealed
+    try:
+        res = verify_sealed(load_json(a.sealed), load_key(a.key))
+    except (OSError, SecretSyncError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if a.format == "json":
+        print(json.dumps(res, indent=2))
+    else:
+        print(f"secretsync verify — key {res['key_id']}")
+        print("=" * 56)
+        for p in res["problems"]:
+            print(f"  ! {p}")
+        print(f"  verified values: {res['verified']}")
+        print("RESULT: " + ("PASS" if res["ok"] else "FAIL"))
+    return 0 if res["ok"] else 1
+
+
+def _run_seal_file(a) -> int:
+    from secretsync import seal_file
+    try:
+        sealed = seal_file(a.file, load_key(a.key))
+    except (OSError, SecretSyncError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _emit(json.dumps(sealed, indent=2), a.out)
+    return 0
+
+
+def _run_unseal_file(a) -> int:
+    from secretsync import unseal_bytes
+    try:
+        data = unseal_bytes(load_json(a.sealed), load_key(a.key))
+        with open(a.out, "wb") as fh:
+            fh.write(data)
+    except (OSError, SecretSyncError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"wrote {len(data)} bytes -> {a.out}", file=sys.stderr)
+    return 0
+
+
+def _run_merge(a) -> int:
+    from secretsync import merge_sealed
+    try:
+        key = load_key(a.key)
+        merged = merge_sealed([load_json(p) for p in a.sealed], key)
+    except (OSError, SecretSyncError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _emit(json.dumps(merged, indent=2), a.out)
+    return 0
+
+
 def _run_mcp() -> int:
     from secretsync.mcp_server import run_mcp_server
     run_mcp_server()
@@ -141,6 +238,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_unseal(args)
     if args.command == "rotate":
         return _run_rotate(args)
+    if args.command == "peek":
+        return _run_peek(args)
+    if args.command == "verify":
+        return _run_verify(args)
+    if args.command == "seal-file":
+        return _run_seal_file(args)
+    if args.command == "unseal-file":
+        return _run_unseal_file(args)
+    if args.command == "merge":
+        return _run_merge(args)
     if args.command == "mcp":
         return _run_mcp()
     parser.print_help(sys.stderr)

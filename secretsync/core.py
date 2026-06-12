@@ -213,6 +213,107 @@ def seal_values(values: Dict[str, str], key: SealKey, *,
 
 
 # --------------------------------------------------------------------------- #
+# Raw blob sealing (files / arbitrary bytes, not just k8s Secrets)
+# --------------------------------------------------------------------------- #
+
+def seal_bytes(data: bytes, key: SealKey, *, name: str = "blob") -> Dict[str, Any]:
+    """Seal arbitrary bytes (e.g. a kubeconfig or a TLS key file)."""
+    return {
+        "apiVersion": "cognis.digital/v1",
+        "kind": "SealedBlob",
+        "metadata": {"name": name},
+        "spec": {"format": SEALED_FORMAT, "key_id": key.key_id,
+                 "size": len(data), "encrypted": _seal_value(key.key, data)},
+    }
+
+
+def unseal_bytes(sealed: Dict[str, Any], key: SealKey) -> bytes:
+    """Decrypt a SealedBlob back into raw bytes."""
+    spec = sealed.get("spec", {}) or {}
+    if spec.get("format") != SEALED_FORMAT or "encrypted" not in spec:
+        raise SecretSyncError("not a recognized SealedBlob")
+    if spec.get("key_id") and spec["key_id"] != key.key_id:
+        raise SecretSyncError(
+            f"key mismatch: sealed with {spec['key_id']}, you have {key.key_id}")
+    return _unseal_value(key.key, spec["encrypted"])
+
+
+def seal_file(path: str, key: SealKey) -> Dict[str, Any]:
+    if not os.path.isfile(path):
+        raise SecretSyncError(f"file not found: {path}")
+    with open(path, "rb") as fh:
+        return seal_bytes(fh.read(), key, name=os.path.basename(path))
+
+
+# --------------------------------------------------------------------------- #
+# Inspection / verification (no decryption needed)
+# --------------------------------------------------------------------------- #
+
+def peek(sealed: Dict[str, Any]) -> Dict[str, Any]:
+    """Describe a sealed object without decrypting it.
+
+    Returns kind, key_id, and the value KEY names (never the plaintext).
+    Useful for review/diff in a PR without holding the private key.
+    """
+    spec = sealed.get("spec", {}) or {}
+    kind = sealed.get("kind", "?")
+    md = sealed.get("metadata", {}) or {}
+    keys = sorted((spec.get("encryptedData") or {}).keys())
+    return {
+        "kind": kind,
+        "name": md.get("name"),
+        "namespace": md.get("namespace"),
+        "key_id": spec.get("key_id"),
+        "format": spec.get("format"),
+        "value_keys": keys,
+        "value_count": len(keys) if keys else (1 if "encrypted" in spec else 0),
+    }
+
+
+def verify_sealed(sealed: Dict[str, Any], key: SealKey) -> Dict[str, Any]:
+    """Verify every value's MAC under ``key`` WITHOUT exposing plaintext.
+
+    Returns {ok, key_id, verified, problems}. A wrong key or tampered blob is
+    reported per-value; nothing is decrypted into the result.
+    """
+    spec = sealed.get("spec", {}) or {}
+    problems: List[str] = []
+    verified = 0
+    if spec.get("key_id") and key.key_id and spec["key_id"] != key.key_id:
+        problems.append(f"key_id mismatch: sealed {spec['key_id']} vs {key.key_id}")
+    blobs = dict(spec.get("encryptedData") or {})
+    if "encrypted" in spec:
+        blobs["<blob>"] = spec["encrypted"]
+    for name, blob in blobs.items():
+        try:
+            _unseal_value(key.key, blob)  # raises on bad MAC
+            verified += 1
+        except SecretSyncError:
+            problems.append(f"value {name!r} failed authentication")
+    return {"ok": not problems, "key_id": key.key_id,
+            "verified": verified, "problems": problems}
+
+
+def merge_sealed(targets: List[Dict[str, Any]], key: SealKey) -> Dict[str, Any]:
+    """Merge several SealedSecrets (same key) into one, re-sealing the union.
+
+    Later entries win on key collisions. All inputs must share the sealing key.
+    """
+    combined: Dict[str, str] = {}
+    name = namespace = None
+    for sealed in targets:
+        secret = unseal_secret(sealed, key)
+        import base64 as _b
+        for k, v in (secret.get("data") or {}).items():
+            combined[k] = _b.b64decode(v).decode("utf-8", "replace")
+        md = sealed.get("metadata", {}) or {}
+        name = name or md.get("name")
+        namespace = namespace or md.get("namespace")
+    return seal_values(combined, key, name=name or "secret",
+                       namespace=namespace or "default")
+
+
+# --------------------------------------------------------------------------- #
 # AI hook (opt-in, default OFF)
 # --------------------------------------------------------------------------- #
 

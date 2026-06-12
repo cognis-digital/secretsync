@@ -9,16 +9,23 @@ from secretsync.core import (
     generate_key,
     load_json,
     load_key,
+    merge_sealed,
+    peek,
     rotate,
+    seal_bytes,
+    seal_file,
     seal_secret,
     seal_values,
+    unseal_bytes,
     unseal_secret,
+    verify_sealed,
 )
 
 __version__ = TOOL_VERSION
 
 __all__ = [
     "TOOL_NAME", "TOOL_VERSION", "__version__", "SealKey", "SecretSyncError",
-    "audit_secret_names", "generate_key", "load_json", "load_key", "rotate",
-    "seal_secret", "seal_values", "unseal_secret",
+    "audit_secret_names", "generate_key", "load_json", "load_key",
+    "merge_sealed", "peek", "rotate", "seal_bytes", "seal_file", "seal_secret",
+    "seal_values", "unseal_bytes", "unseal_secret", "verify_sealed",
 ]

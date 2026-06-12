@@ -111,7 +111,8 @@ class TestMcp(unittest.TestCase):
 
     def test_list(self):
         tl = mcp_server.handle_request({"jsonrpc": "2.0", "id": 3, "method": "tools/list"})
-        self.assertEqual({t["name"] for t in tl["result"]["tools"]}, {"seal", "unseal"})
+        self.assertTrue({"seal", "unseal"}.issubset(
+            {t["name"] for t in tl["result"]["tools"]}))
 
 
 class TestAiHook(unittest.TestCase):

@@ -47,6 +47,26 @@ _TOOLS = [
             "required": ["sealed", "key"], "additionalProperties": False,
         },
     },
+    {
+        "name": "peek",
+        "description": "Describe a sealed object (kind, key id, value key names) "
+                       "WITHOUT decrypting it — safe for PR review.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"sealed": {"type": "string"}},
+            "required": ["sealed"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "verify",
+        "description": "Verify every sealed value's MAC under a key without "
+                       "exposing plaintext; detects tampering or wrong key.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"sealed": {"type": "string"}, "key": {"type": "string"}},
+            "required": ["sealed", "key"], "additionalProperties": False,
+        },
+    },
 ]
 
 
@@ -73,6 +93,22 @@ def _call_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         secret = unseal_secret(load_json(sealed), load_key(key))
         return {"content": [{"type": "text", "text": json.dumps(secret, indent=2)}],
                 "isError": False}
+    if name == "peek":
+        from secretsync import peek as _peek
+        sealed = args.get("sealed")
+        if not isinstance(sealed, str):
+            raise ValueError("`sealed` (string) is required")
+        info = _peek(load_json(sealed))
+        return {"content": [{"type": "text", "text": json.dumps(info, indent=2)}],
+                "isError": False}
+    if name == "verify":
+        from secretsync import verify_sealed
+        sealed, key = args.get("sealed"), args.get("key")
+        if not isinstance(sealed, str) or not isinstance(key, str):
+            raise ValueError("`sealed` and `key` (strings) are required")
+        res = verify_sealed(load_json(sealed), load_key(key))
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}],
+                "isError": not res["ok"]}
     raise ValueError(f"unknown tool: {name}")
 
 
