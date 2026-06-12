@@ -78,7 +78,7 @@ workflows (Cognis.Studio, Claude Desktop, Cursor).
 ```bash
 # Fail the pipeline if a committed sealed file is tampered or sealed with the
 # wrong key:
-python -m secretsync verify deploy/sealed-secrets.json --key $CI_SEAL_KEY || exit 1
+python -m secretsync verify deploy/secrets.sealed.json --key $CI_SEAL_KEY || exit 1
 ```
 
 ## Threat model note
