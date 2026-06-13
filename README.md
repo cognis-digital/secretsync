@@ -75,3 +75,33 @@ branding.
 
 Part of the **Cognis Neural Suite** — 300+ source-available tools organized across 12 domains under the JTF MERIDIAN command structure. See the [suite on GitHub](https://github.com/cognis-digital) and [jtf-meridian](https://github.com/cognis-digital/jtf-meridian) for how the pieces fit together.
 <!-- cognis:domains:end -->
+
+## Usage — step by step
+
+`secretsync` seals Kubernetes Secret values into a manifest **safe to commit to git**, and unseals them only where the private key lives.
+
+1. **Install** (pure stdlib, Python 3.10+):
+   ```bash
+   pip install "git+https://github.com/cognis-digital/secretsync.git"
+   ```
+2. **Generate a sealing key** — a private `.sealkey` (kept in-cluster) and a public `.sealpub` label:
+   ```bash
+   secretsync keygen --out ss
+   ```
+3. **Seal** a Secret manifest, or inline values, into a commit-safe SealedSecret:
+   ```bash
+   secretsync seal secret.json --key ss.sealkey --out sealed.json
+   secretsync seal --key ss.sealpub --set DB_PASSWORD=hunter2 --name app --out sealed.json
+   ```
+4. **Use the sealed object** — `peek` describes it without decrypting, `verify` checks every value's MAC, and `unseal` (private key only) recovers the Secret:
+   ```bash
+   secretsync peek   sealed.json
+   secretsync verify sealed.json --key ss.sealkey
+   secretsync unseal sealed.json --key ss.sealkey --out secret.json
+   ```
+5. **Automate** — rotate to a new key, or seal an arbitrary file, in a pipeline:
+   ```bash
+   secretsync rotate sealed.json --old-key ss.sealkey --new-key ss2.sealkey --out sealed.json
+   secretsync seal-file config.bin --key ss.sealkey --out config.sealed.json
+   ```
+   Or run it as a local MCP server (stdio JSON-RPC): `secretsync mcp`.
