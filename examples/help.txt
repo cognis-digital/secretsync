@@ -1,0 +1,24 @@
+$ secretsync-emit --help
+
+usage: secretsync [-h] [--version]
+                  {keygen,seal,unseal,rotate,peek,verify,seal-file,unseal-file,merge,mcp} ...
+
+Declarative secret sealing & sync for GitOps — encrypt secrets into manifests
+safe to commit; unseal in-cluster.
+
+positional arguments:
+  {keygen,seal,unseal,rotate,peek,verify,seal-file,unseal-file,merge,mcp}
+    keygen              Generate a sealing key.
+    seal                Seal a Secret manifest (or --set values).
+    unseal              Unseal a SealedSecret back to a Secret.
+    rotate              Re-seal under a new key.
+    peek                Describe a sealed object without decrypting it.
+    verify              Verify every value's MAC without exposing plaintext.
+    seal-file           Seal an arbitrary file into a SealedBlob.
+    unseal-file         Unseal a SealedBlob to bytes on disk.
+    merge               Merge multiple SealedSecrets (same key) into one.
+    mcp                 Run as an MCP server (stdio JSON-RPC).
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit

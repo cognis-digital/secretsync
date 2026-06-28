@@ -9,6 +9,70 @@ Part of the **Cognis Neural Suite**.
 
 ---
 
+
+<!-- cognis:example:start -->
+## 🔎 Example output
+
+Real, reproducible output from the tool — runs offline:
+
+```console
+$ secretsync-emit --version
+secretsync 0.1.0
+```
+
+```console
+$ secretsync-emit --help
+usage: secretsync [-h] [--version]
+                  {keygen,seal,unseal,rotate,peek,verify,seal-file,unseal-file,merge,mcp} ...
+
+Declarative secret sealing & sync for GitOps — encrypt secrets into manifests
+safe to commit; unseal in-cluster.
+
+positional arguments:
+  {keygen,seal,unseal,rotate,peek,verify,seal-file,unseal-file,merge,mcp}
+    keygen              Generate a sealing key.
+    seal                Seal a Secret manifest (or --set values).
+    unseal              Unseal a SealedSecret back to a Secret.
+    rotate              Re-seal under a new key.
+    peek                Describe a sealed object without decrypting it.
+    verify              Verify every value's MAC without exposing plaintext.
+    seal-file           Seal an arbitrary file into a SealedBlob.
+    unseal-file         Unseal a SealedBlob to bytes on disk.
+    merge               Merge multiple SealedSecrets (same key) into one.
+    mcp                 Run as an MCP server (stdio JSON-RPC).
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+```
+
+> Blocks above are real `secretsync` output — reproduce them from a clone.
+
+**Sample result format** _(illustrative values — run on your own data for real findings):_
+
+```
+{
+"findings": [
+    {
+        "id": "1234567890",
+        "title": "Suspicious Network Traffic",
+        "description": "Network traffic detected between 192.168.1.100 and 8.8.8.8",
+        "severity": "medium",
+        "type": "network_traffic"
+    },
+    {
+        "id": "2345678901",
+        "title": "Unusual File Access",
+        "description": "File access detected on /home/user/Documents/secret.txt",
+        "severity": "high",
+        "type": "file_access"
+    }
+]
+}
+```
+
+<!-- cognis:example:end -->
+
 ## Why
 
 Plaintext Secrets in git are a top supply-chain mistake, but most teams want
